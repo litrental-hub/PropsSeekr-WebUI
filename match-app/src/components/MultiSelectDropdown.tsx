@@ -13,6 +13,7 @@ interface MultiSelectDropdownProps {
   selected: string[];
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
@@ -20,7 +21,8 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
   options,
   selected,
   onChange,
-  placeholder = "Select..."
+  placeholder = "Select...",
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -48,9 +50,11 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          disabled={disabled}
           className={cn(
             "w-full flex items-center justify-between px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium transition-all hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20",
-            isOpen && "border-primary-500 ring-2 ring-primary-500/20"
+            isOpen && "border-primary-500 ring-2 ring-primary-500/20",
+            disabled && "bg-slate-50 text-slate-400 cursor-not-allowed hover:border-slate-200"
           )}
         >
           <span className={cn("truncate", selected.length === 0 ? "text-slate-400" : "text-slate-900")}>
@@ -59,7 +63,7 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", isOpen && "rotate-180")} />
         </button>
 
-        {isOpen && (
+        {isOpen && !disabled && (
           <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl py-2 animate-in fade-in zoom-in-95 duration-100 max-h-60 overflow-y-auto">
             {options.map((option) => (
               <button

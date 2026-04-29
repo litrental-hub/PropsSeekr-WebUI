@@ -9,15 +9,36 @@ const api = axios.create({
   },
 });
 
+type UploadInitResponse = {
+  uploadUrl: string;
+  bucket: string;
+  key: string;
+};
+
 export const matchService = {
   uploadFile: async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Step 1: request a presigned upload URL from backend
+    const init = await api.post<UploadInitResponse>('/upload', {
+      fileName: file.name,
     });
+
+    const { uploadUrl, bucket, key } = init.data;
+    if (!uploadUrl || !bucket || !key) {
+      throw new Error('Upload initialization failed (missing uploadUrl/bucket/key).');
+    }
+
+    // Step 2: upload file directly to S3
+    await axios.put(uploadUrl, file, {
+      headers: {
+        // Backend example suggests text/plain; use file.type if provided.
+        'Content-Type': file.type || 'text/plain',
+      },
+      // Avoid axios trying to JSON-serialize the File.
+      transformRequest: [(data) => data],
+    });
+
+    // Keep return shape compatible with UploadPage (it reads response.data.bucket/key)
+    return { data: { bucket, key } };
   },
 
   searchMatches: async (_filters: any, page = 1, pageSize = 20) => {

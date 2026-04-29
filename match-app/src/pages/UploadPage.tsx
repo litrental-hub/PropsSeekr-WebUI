@@ -28,9 +28,12 @@ const UploadPage: React.FC = () => {
 
     setStatus('loading');
     try {
-      await matchService.uploadFile(file);
+      const response = await matchService.uploadFile(file);
       setStatus('success');
-      setMessage(`Successfully uploaded ${file.name}`);
+      const bucket = response?.data?.bucket ? `Bucket: ${response.data.bucket}` : '';
+      const key = response?.data?.key ? `Key: ${response.data.key}` : '';
+      const details = [bucket, key].filter(Boolean).join(' • ');
+      setMessage(`Successfully uploaded ${file.name}${details ? ` (${details})` : ''}`);
       setFile(null);
     } catch (err: any) {
       setStatus('error');

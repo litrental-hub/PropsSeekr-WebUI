@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileUp } from 'lucide-react';
+import { LayoutDashboard, FileUp, Building } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,6 +12,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Upload', path: '/upload', icon: FileUp },
+    { name: 'Add Property', path: '/add-property', icon: Building },
   ];
 
   return (

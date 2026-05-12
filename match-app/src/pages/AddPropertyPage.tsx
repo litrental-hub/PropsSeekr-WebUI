@@ -104,12 +104,6 @@ const CONFIGURATION_OPTIONS = [
 
 const SIZE_UNIT_OPTIONS = ['Sq Ft', 'Sq Yd', 'Sq M', 'Acre', 'Hectare'] as const;
 
-const PRICE_UNIT_OPTIONS = [
-  { value: '', label: 'Not specified' },
-  { value: 'TOTAL', label: 'Total' },
-  { value: 'PER_SQFT', label: 'Per Sqft' },
-] as const;
-
 const PRICE_DENOM_OPTIONS = [
   { value: 'K', label: 'Thousand (K)', multiplier: 1_000 },
   { value: 'L', label: 'Lakh (L)', multiplier: 1_00_000 },

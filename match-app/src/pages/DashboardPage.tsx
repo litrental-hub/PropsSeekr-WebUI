@@ -93,6 +93,7 @@ const DashboardPage: React.FC = () => {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('scorePercent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [activeTab, setActiveTab] = useState<string>('SELL');
 
   const LISTING_TYPE_OPTIONS = ['SELL', 'RENT', 'LEASE'];
   const REQUIREMENT_TYPE_OPTIONS = ['BUY', 'RENT'];
@@ -149,6 +150,21 @@ const DashboardPage: React.FC = () => {
       const exists = current.includes(value);
       const next = exists ? current.filter((v) => v !== value) : [...current, value];
       return { ...prev, locations: next };
+    });
+    setPage(1);
+  };
+
+  const handleSegmentSelect = (key: string) => {
+    setExpandedRow(null);
+    setActiveTab(key);
+    setFilters((prev) => {
+      if (key === 'BUY') {
+        return { ...prev, listingType: ['BUY'] };
+      }
+      if (key === 'LEASE') {
+        return { ...prev, listingType: ['RENT'] };
+      }
+      return { ...prev, listingType: ['SELL'] };
     });
     setPage(1);
   };
@@ -385,6 +401,30 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Top segmented control: Sell | Buy | Lease (UI only) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-1">
+        <div className="flex">
+          {['Sell', 'Buy', 'Lease'].map((label, i) => {
+            const key = label.toUpperCase();
+            const isActive = activeTab === key;
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => { handleSegmentSelect(key); }}
+                className={`flex-1 text-center py-2 text-sm font-black rounded-lg transition-colors focus:outline-none ${
+                  isActive
+                    ? 'bg-gradient-to-r from-primary-600 via-indigo-500 to-primary-600 text-white'
+                    : 'bg-white text-slate-700 hover:bg-slate-50'
+                } ${i < 2 ? 'mr-1' : ''}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {/* Filter Section (Keeping the UI, but we mostly rely on pagination based on API limits) */}
       <section className={pageUi.panel}>
         <div className={`${pageUi.panelHeader} ${pageUi.panelHeaderMuted}`}>

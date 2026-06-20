@@ -21,6 +21,52 @@ type SortKey =
   | 'buyer.budget'
   | null;
 
+const displayValue = (value: any) => {
+  if (value == null || value === '') return '-';
+  return value;
+};
+
+const joinDetails = (...parts: any[]) => {
+  const values = parts
+    .map((part) => String(part ?? '').trim())
+    .filter((part) => part && part !== '-');
+
+  return values.length ? values.join(' - ') : '-';
+};
+
+const extractFurnishing = (item: any) => {
+  const explicit = String(item?.furnishing ?? item?.furnished ?? item?.furnishingStatus ?? '').trim();
+  if (explicit && explicit !== '-') return explicit;
+
+  const rawText = String(item?.rawText ?? '').toLowerCase();
+  if (!rawText) return '';
+
+  if (/\b(semi[-\s]?furnished|semi furnished)\b/.test(rawText)) return 'Semi furnished';
+  if (/\b(non[-\s]?furnished|not furnished|unfurnished|without furniture)\b/.test(rawText)) return 'Non furnished';
+  if (/\b(full furnished|fully furnished|furnished)\b/.test(rawText)) return 'Fully furnished';
+
+  return '';
+};
+
+const buildSpecifications = (item: any) =>
+  joinDetails(item?.config, item?.type, extractFurnishing(item), item?.size);
+
+const DetailLine = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <p className="text-sm leading-6">
+    <span className="text-slate-400 font-semibold">{label}:</span>{' '}
+    <strong className="text-slate-900 font-black break-words">{displayValue(value)}</strong>
+  </p>
+);
+
+const RawTextBlock = ({ value }: { value: any }) => (
+  <div>
+    <p className="text-sm leading-6 text-slate-400 font-semibold">Raw Text:</p>
+    <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-800 font-mono break-words min-h-[88px]">
+      {displayValue(value)}
+    </pre>
+  </div>
+);
+
 const DashboardPage: React.FC = () => {
   const initialFilters = {
     startDate: '',
@@ -489,7 +535,7 @@ const DashboardPage: React.FC = () => {
                     className="group inline-flex items-center gap-2 hover:text-slate-700 transition-colors"
                     title="Sort by property location"
                   >
-                    Property
+                    Buyer Requirement
                     {sortKey === 'property.location' ? (
                       sortDirection === 'asc' ? (
                         <ArrowUp className="w-3.5 h-3.5 text-slate-600" />
@@ -508,7 +554,7 @@ const DashboardPage: React.FC = () => {
                     className="group inline-flex items-center gap-2 hover:text-slate-700 transition-colors"
                     title="Sort by buyer budget"
                   >
-                    Buyer Requirement
+                    Property
                     {sortKey === 'buyer.budget' ? (
                       sortDirection === 'asc' ? (
                         <ArrowUp className="w-3.5 h-3.5 text-slate-600" />
@@ -524,10 +570,8 @@ const DashboardPage: React.FC = () => {
                 <th className="px-6 py-4"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <AnimatedLoader />
-              ) : sortedMatches.length > 0 ? (
+            <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
+              {sortedMatches.length > 0 ? (
                 sortedMatches.map((match: any, idx: number) => (
                   <React.Fragment key={idx}>
                     <tr className="hover:bg-slate-50/70 transition-colors">
@@ -542,6 +586,17 @@ const DashboardPage: React.FC = () => {
                           </span>
                         </div>
                       </td>
+                      <td className="px-6 py-4 text-sm space-y-1">
+                        <div className="flex items-center text-slate-900 font-bold">
+                          <Target className="w-3 h-3 mr-1 text-slate-400" /> {match.buyer.lookingFor} ({match.buyer.type})
+                        </div>
+                        <div className="flex items-center text-slate-900 font-bold">
+                          <IndianRupee className="w-3 h-3 mr-1" /> {match.buyer.budget}
+                        </div>
+                        <div className="text-slate-500 text-xs mt-1 truncate max-w-[200px] font-medium">
+                          {match.buyer.location}
+                        </div>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="text-sm space-y-1">
                           <div className="flex items-center text-slate-900 font-bold">
@@ -553,17 +608,6 @@ const DashboardPage: React.FC = () => {
                           <div className="flex items-center text-slate-500 text-xs font-medium">
                             <IndianRupee className="w-3 h-3 mr-1" /> {match.property.price} • <Maximize2 className="w-3 h-3 mx-1" /> {match.property.size}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm space-y-1">
-                        <div className="flex items-center text-slate-900 font-bold">
-                          <Target className="w-3 h-3 mr-1 text-slate-400" /> {match.buyer.lookingFor} ({match.buyer.type})
-                        </div>
-                        <div className="flex items-center text-slate-900 font-bold">
-                          <IndianRupee className="w-3 h-3 mr-1" /> {match.buyer.budget}
-                        </div>
-                        <div className="text-slate-500 text-xs mt-1 truncate max-w-[200px] font-medium">
-                          {match.buyer.location}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -593,18 +637,31 @@ const DashboardPage: React.FC = () => {
                         <td colSpan={5} className="px-6 py-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
                             <div>
-                               <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Property Broker</h3>
+                               <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Buyer Broker</h3>
                                <div className="space-y-2">
-                                 <p className="text-sm"><span className="text-slate-400 font-medium">Name:</span> <strong>{match.property.brokerName}</strong></p>
-                                 <p className="text-sm"><span className="text-slate-400 font-medium">Phone:</span> <strong>{match.property.brokerPhone}</strong></p>
-                                 <p className="text-sm"><span className="text-slate-400 font-medium">Status:</span> <strong>{match.property.for}</strong></p>
+                                 <DetailLine label="Name" value={match.buyer.brokerName} />
+                                 <DetailLine label="Phone" value={match.buyer.brokerPhone} />
+                                 <DetailLine label="Price" value={match.buyer.budget} />
+                                 <DetailLine label="Status" value={match.buyer.lookingFor} />
+                                 <DetailLine label="Location" value={match.buyer.location} />
+                                 <DetailLine label="Specifications" value={buildSpecifications(match.buyer)} />
+                                 <DetailLine label="Group" value={match.buyer.groupName} />
+                                 <DetailLine label="Date/Time" value={match.buyer.messageDateTime} />
+                                 <RawTextBlock value={match.buyer.rawText} />
                                </div>
                             </div>
                             <div>
-                               <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Buyer Broker</h3>
+                               <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Property Broker</h3>
                                <div className="space-y-2">
-                                 <p className="text-sm"><span className="text-slate-400 font-medium">Name:</span> <strong>{match.buyer.brokerName}</strong></p>
-                                 <p className="text-sm"><span className="text-slate-400 font-medium">Phone:</span> <strong>{match.buyer.brokerPhone}</strong></p>
+                                 <DetailLine label="Name" value={match.property.brokerName} />
+                                 <DetailLine label="Phone" value={match.property.brokerPhone} />
+                                 <DetailLine label="Price" value={match.property.price} />
+                                 <DetailLine label="Status" value={match.property.for} />
+                                 <DetailLine label="Location" value={match.property.location} />
+                                 <DetailLine label="Specifications" value={buildSpecifications(match.property)} />
+                                 <DetailLine label="Group" value={match.property.groupName} />
+                                 <DetailLine label="Date/Time" value={match.property.messageDateTime} />
+                                 <RawTextBlock value={match.property.rawText} />
                                </div>
                             </div>
                           </div>
@@ -613,6 +670,8 @@ const DashboardPage: React.FC = () => {
                     )}
                   </React.Fragment>
                 ))
+              ) : loading ? (
+                <AnimatedLoader />
               ) : (
                 <tr>
                   <td colSpan={5} className="px-6 py-20 text-center text-slate-500">

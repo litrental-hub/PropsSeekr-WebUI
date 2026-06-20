@@ -65,42 +65,47 @@ const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", isOpen && "rotate-180")} />
         </button>
 
-        {isOpen && !disabled && (
-          <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl py-2 animate-in fade-in zoom-in-95 duration-100 max-h-60 overflow-y-auto">
-            {options.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onChange(option)}
-                className="w-full flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-primary-50 transition-colors"
-              >
-                <div className={cn(
-                  "w-4 h-4 rounded border mr-3 flex items-center justify-center transition-colors",
-                  selected.includes(option) ? "bg-primary-600 border-primary-600" : "bg-white border-slate-300"
-                )}>
-                  {selected.includes(option) && <Check className="w-3 h-3 text-white" />}
-                </div>
-                <span className={cn(selected.includes(option) && "font-bold text-primary-700")}>
-                  {option.replace('_', ' ')}
-                </span>
-              </button>
-            ))}
-            {selected.length > 0 && (
-              <div className="border-t border-slate-100 mt-2 pt-2 px-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Clear all logic would go here, but for now we'll just handle it in parent if needed
-                  }}
-                  className="w-full text-center text-xs font-bold text-primary-600 py-1 hover:text-primary-700"
-                >
-                  {selected.length} items selected
-                </button>
+        <div
+          className={cn(
+            "absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl py-2 max-h-60 overflow-y-auto transition-all duration-150 ease-out origin-top",
+            isOpen && !disabled
+              ? "opacity-100 translate-y-0 scale-100 pointer-events-auto visible"
+              : "opacity-0 -translate-y-2 scale-95 pointer-events-none invisible"
+          )}
+        >
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange(option)}
+              className="w-full flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-primary-50 transition-colors"
+            >
+              <div className={cn(
+                "w-4 h-4 rounded border mr-3 flex items-center justify-center transition-colors",
+                selected.includes(option) ? "bg-primary-600 border-primary-600" : "bg-white border-slate-300"
+              )}>
+                {selected.includes(option) && <Check className="w-3 h-3 text-white" />}
               </div>
-            )}
-          </div>
-        )}
+              <span className={cn(selected.includes(option) && "font-bold text-primary-700")}>
+                {option.replace('_', ' ')}
+              </span>
+            </button>
+          ))}
+          {selected.length > 0 && (
+            <div className="border-t border-slate-100 mt-2 pt-2 px-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Clear all logic would go here, but for now we'll just handle it in parent if needed
+                }}
+                className="w-full text-center text-xs font-bold text-primary-600 py-1 hover:text-primary-700"
+              >
+                {selected.length} items selected
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

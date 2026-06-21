@@ -4,7 +4,7 @@ import {
   Target, Layers, 
   Download, ChevronLeft, ChevronRight as ChevronRightIcon,
   MapPin, IndianRupee, Maximize2, RotateCcw, Home,
-  ArrowUpDown, ArrowUp, ArrowDown, AlertCircle, Clock3, MessageSquareText, Radio
+  ArrowUpDown, ArrowUp, ArrowDown, AlertCircle
 } from 'lucide-react';
 import { matchService, type DashboardResponse } from '../services/api';
 import { format } from 'date-fns';
@@ -130,6 +130,30 @@ const DashboardPage: React.FC = () => {
     }
     return null;
   };
+
+  const cleanApiValue = (value: unknown) => {
+    const text = value == null ? '' : String(value).trim();
+    return text && text !== '-' ? text : '';
+  };
+
+  const displayApiDate = (...values: unknown[]) => {
+    const text = values.map(cleanApiValue).find(Boolean);
+    if (!text) return 'No date from API';
+
+    const dateMatch = text.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/) || text.match(/\b\d{4}-\d{1,2}-\d{1,2}\b/);
+    return dateMatch?.[0] ?? text;
+  };
+
+  const getMessageMeta = (entity: any) => ({
+    source:
+      cleanApiValue(entity?.source) ||
+      cleanApiValue(entity?.groupName) ||
+      cleanApiValue(entity?.brokerName) ||
+      cleanApiValue(entity?.brokerPhone) ||
+      'Source not provided by API',
+    message: cleanApiValue(entity?.message) || cleanApiValue(entity?.rawText) || 'Message not provided by API',
+    dateTime: displayApiDate(entity?.dateTime, entity?.messageDateTime),
+  });
 
   const filteredMatches = (() => {
     const matches = (data?.matches ?? []) as any[];
@@ -344,40 +368,6 @@ const DashboardPage: React.FC = () => {
           <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-rose-600" />
           <span className="font-medium">{error}</span>
         </div>
-      )}
-
-      {data && (
-        <section className={pageUi.panel} aria-label="Dashboard response details">
-          <div className={`${pageUi.panelBody} grid grid-cols-1 gap-5 md:grid-cols-3`}>
-            <div className="flex items-start gap-3">
-              <div className={pageUi.panelHeaderIconWrap}>
-                <Radio className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className={pageUi.label}>Source</p>
-                <p className="mt-1 break-words text-sm font-bold text-slate-900">{data.source || '-'}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className={pageUi.panelHeaderIconWrap}>
-                <MessageSquareText className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className={pageUi.label}>Message</p>
-                <p className="mt-1 break-words text-sm font-bold text-slate-900">{data.message || '-'}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className={pageUi.panelHeaderIconWrap}>
-                <Clock3 className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className={pageUi.label}>Date &amp; Time</p>
-                <p className="mt-1 break-words text-sm font-bold text-slate-900">{data.dateTime || '-'}</p>
-              </div>
-            </div>
-          </div>
-        </section>
       )}
 
       {/* Filter Section (Keeping the UI, but we mostly rely on pagination based on API limits) */}
@@ -632,6 +622,11 @@ const DashboardPage: React.FC = () => {
                     {expandedRow === idx && (
                       <tr className="bg-slate-50/30 border-l-4 border-primary-500 animate-in slide-in-from-left-1 duration-200">
                         <td colSpan={5} className="px-6 py-6">
+                          {(() => {
+                            const propertyMeta = getMessageMeta(match.property);
+                            const buyerMeta = getMessageMeta(match.buyer);
+
+                            return (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
                             <div>
                                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">Property Broker</h3>
@@ -639,6 +634,12 @@ const DashboardPage: React.FC = () => {
                                  <p className="text-sm"><span className="text-slate-400 font-medium">Name:</span> <strong>{match.property.brokerName}</strong></p>
                                  <p className="text-sm"><span className="text-slate-400 font-medium">Phone:</span> <strong>{match.property.brokerPhone}</strong></p>
                                  <p className="text-sm"><span className="text-slate-400 font-medium">Status:</span> <strong>{match.property.for}</strong></p>
+                                 <p className="text-sm"><span className="text-slate-400 font-medium">Source:</span> <strong>{propertyMeta.source}</strong></p>
+                                 <p className="text-sm"><span className="text-slate-400 font-medium">Date &amp; Time:</span> <strong>{propertyMeta.dateTime}</strong></p>
+                                 <div className="text-sm">
+                                   <span className="text-slate-400 font-medium">Message:</span>
+                                   <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-slate-700">{propertyMeta.message}</p>
+                                 </div>
                                </div>
                             </div>
                             <div>
@@ -646,9 +647,17 @@ const DashboardPage: React.FC = () => {
                                <div className="space-y-2">
                                  <p className="text-sm"><span className="text-slate-400 font-medium">Name:</span> <strong>{match.buyer.brokerName}</strong></p>
                                  <p className="text-sm"><span className="text-slate-400 font-medium">Phone:</span> <strong>{match.buyer.brokerPhone}</strong></p>
+                                 <p className="text-sm"><span className="text-slate-400 font-medium">Source:</span> <strong>{buyerMeta.source}</strong></p>
+                                 <p className="text-sm"><span className="text-slate-400 font-medium">Date &amp; Time:</span> <strong>{buyerMeta.dateTime}</strong></p>
+                                 <div className="text-sm">
+                                   <span className="text-slate-400 font-medium">Message:</span>
+                                   <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-slate-700">{buyerMeta.message}</p>
+                                 </div>
                                </div>
                             </div>
                           </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     )}

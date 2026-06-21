@@ -16,9 +16,6 @@ type UploadInitResponse = {
 };
 
 export type DashboardResponse = {
-  source: string;
-  message: string;
-  dateTime: string;
   matches?: unknown[];
   pagination?: {
     currentPage: number;

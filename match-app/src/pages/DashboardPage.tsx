@@ -10,7 +10,6 @@ import { matchService } from '../services/api';
 import { format } from 'date-fns';
 import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import { pageUi } from '../lib/pageUi';
-import * as XLSX from 'xlsx';
 
 type SortDirection = 'asc' | 'desc';
 type SortKey =
@@ -67,24 +66,79 @@ const RawTextBlock = ({ value }: { value: any }) => (
   </div>
 );
 
-const DashboardPage: React.FC = () => {
-  const initialFilters = {
-    startDate: '',
-    endDate: '',
-    listingType: [] as string[],
-    requirementType: [] as string[],
-    matchStatus: [] as string[],
-    tier: [] as string[],
-    brokerName: '',
-    locations: [] as string[],
-    minPrice: '',
-    maxPrice: '',
-    minBudget: '',
-    maxBudget: '',
-    searchText: '',
-  };
+type FilterOption = { value: string; label: string };
 
-  const [filters, setFilters] = useState(initialFilters);
+type FilterState = {
+  startDate: string;
+  endDate: string;
+  listingType: string[];
+  requirementType: string[];
+  matchStatus: string[];
+  tier: string[];
+  brokerName: string;
+  locations: string[];
+  minPrice: string;
+  maxPrice: string;
+  minBudget: string;
+  maxBudget: string;
+  searchText: string;
+};
+
+const buildInitialFilters = (): FilterState => ({
+  startDate: '',
+  endDate: '',
+  listingType: [],
+  requirementType: [],
+  matchStatus: [],
+  tier: [],
+  brokerName: '',
+  locations: [],
+  minPrice: '',
+  maxPrice: '',
+  minBudget: '',
+  maxBudget: '',
+  searchText: '',
+});
+
+const normalizeFilterText = (value: any) => String(value ?? '').trim().toUpperCase();
+
+const normalizeListingType = (raw: any) => {
+  const value = normalizeFilterText(raw);
+  if (!value) return '';
+  if (value.includes('FOR_SALE') || value.includes('SALE') || value.includes('SELL')) return 'FOR_SALE';
+  if (value.includes('FOR_RENT') || value.includes('RENT')) return 'FOR_RENT';
+  if (value.includes('LEASE')) return 'LEASE';
+  return '';
+};
+
+const normalizeRequirementType = (raw: any) => {
+  const value = normalizeFilterText(raw);
+  if (!value) return '';
+  if (value.includes('BUY') || value.includes('PURCHASE')) return 'BUY';
+  if (value.includes('RENT')) return 'RENT';
+  return '';
+};
+
+const LISTING_TYPE_OPTIONS: FilterOption[] = [
+  { value: 'FOR_SALE', label: 'For Sale' },
+  { value: 'FOR_RENT', label: 'For Rent' },
+  { value: 'LEASE', label: 'Lease' },
+];
+
+const REQUIREMENT_TYPE_OPTIONS: FilterOption[] = [
+  { value: 'BUY', label: 'Want to Buy' },
+  { value: 'RENT', label: 'Want to Rent' },
+];
+
+const MATCH_SCORE_OPTIONS: FilterOption[] = [
+  { value: '90', label: '90% and above' },
+  { value: '80', label: '80% and above' },
+  { value: '70', label: '70% and above' },
+  { value: '60', label: '60% and above' },
+];
+
+const DashboardPage: React.FC = () => {
+  const [filters, setFilters] = useState(buildInitialFilters());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [, setError] = useState('');
@@ -94,19 +148,25 @@ const DashboardPage: React.FC = () => {
   const [sortKey, setSortKey] = useState<SortKey>('scorePercent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  const LISTING_TYPE_OPTIONS = ['SELL', 'RENT', 'LEASE'];
-  const REQUIREMENT_TYPE_OPTIONS = ['BUY', 'RENT'];
-  const MATCH_STATUS_OPTIONS = ['MATCHED', 'PENDING_CONFIRMATION', 'CONFIRMED'];
-
   const locationOptions = (() => {
     const matches = (data?.matches ?? []) as any[];
     const set = new Set<string>();
+
     for (const m of matches) {
-      const loc = String(m?.property?.location ?? '').trim();
-      if (loc) set.add(loc);
+      for (const loc of [m?.property?.location, m?.buyer?.location, m?.property?.city, m?.buyer?.city]) {
+        const value = String(loc ?? '').trim();
+        if (value) set.add(value);
+      }
     }
+
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   })();
+
+  const selectedScoreThresholds = filters.matchStatus
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+
+  const minSelectedScoreThreshold = selectedScoreThresholds.length ? Math.min(...selectedScoreThresholds) : null;
 
   const handleSearch = async () => {
     setLoading(true);
@@ -123,7 +183,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const resetFilters = () => {
-    setFilters(initialFilters);
+    setFilters(buildInitialFilters());
     setPage(1);
   };
 
@@ -194,36 +254,28 @@ const DashboardPage: React.FC = () => {
       const propertyFor = String(getMatchField(m, ['property.for', 'property.status', 'listingType', 'property.listingType']) ?? '');
       const buyerLookingFor = String(getMatchField(m, ['buyer.lookingFor', 'requirementType', 'buyer.requirementType']) ?? '');
 
-      const normalize = (s: string) => s.trim().toUpperCase();
-      const listingTypeRaw = normalize(propertyFor);
-      const requirementTypeRaw = normalize(buyerLookingFor);
+      const listingType = normalizeListingType(propertyFor);
+      const requirementType = normalizeRequirementType(buyerLookingFor);
 
-      const listingType =
-        listingTypeRaw.includes('SALE') || listingTypeRaw.includes('SELL')
-          ? 'SELL'
-          : listingTypeRaw.includes('RENT')
-            ? 'RENT'
-            : listingTypeRaw.includes('LEASE')
-              ? 'LEASE'
-              : '';
-
-      const requirementType =
-        requirementTypeRaw.includes('BUY')
-          ? 'BUY'
-          : requirementTypeRaw.includes('RENT')
-            ? 'RENT'
-            : '';
-
-      // matchStatus isn't present in current API response; do not filter by it unless backend provides it.
-      const matchStatus = String(getMatchField(m, ['matchStatus', 'status']) ?? '').trim().toUpperCase();
+      const scorePercent = Number(m?.scorePercent);
 
       if (filters.listingType.length > 0 && (!listingType || !filters.listingType.includes(listingType))) return false;
       if (filters.requirementType.length > 0 && (!requirementType || !filters.requirementType.includes(requirementType))) return false;
-      if (filters.matchStatus.length > 0 && matchStatus && !filters.matchStatus.includes(matchStatus)) return false;
+      if (selectedScoreThresholds.length > 0) {
+        if (!Number.isFinite(scorePercent) || scorePercent < minSelectedScoreThreshold!) return false;
+      }
 
       if (filters.locations.length > 0) {
-        const propLoc = String(m?.property?.location ?? '').trim();
-        if (!propLoc || !filters.locations.includes(propLoc)) return false;
+        const candidateLocations = [
+          m?.property?.location,
+          m?.buyer?.location,
+          m?.property?.city,
+          m?.buyer?.city,
+        ]
+          .map((value) => String(value ?? '').trim())
+          .filter(Boolean);
+
+        if (!candidateLocations.some((value) => filters.locations.includes(value))) return false;
       }
 
       if (minPrice != null || maxPrice != null) {
@@ -270,9 +322,6 @@ const DashboardPage: React.FC = () => {
     });
   })();
 
-  const hasMatchStatusField = Boolean(
-    (data?.matches ?? []).some((m: any) => m?.matchStatus != null || m?.status != null)
-  );
 
   const getSortableValue = (match: any, key: Exclude<SortKey, null>) => {
     const readPath = (obj: any, path: string) =>
@@ -329,64 +378,75 @@ const DashboardPage: React.FC = () => {
     });
   };
 
-  const exportToExcel = () => {
+  const exportToCsv = () => {
     if (!sortedMatches.length) return;
 
-    const rows = sortedMatches.map((m: any) => ({
-      'Score %': m.scorePercent ?? '',
-      'Match Quality': m.matchQuality ?? '',
-      'Property For': m?.property?.for ?? '',
-      'Property Type': m?.property?.type ?? '',
-      'Property Config': m?.property?.config ?? '',
-      'Property Location': m?.property?.location ?? '',
-      'Property City': m?.property?.city ?? '',
-      'Property Price': m?.property?.price ?? '',
-      'Property Size': m?.property?.size ?? '',
-      'Property Broker': m?.property?.brokerName ?? '',
-      'Property Broker Phone': m?.property?.brokerPhone ?? '',
-      'Buyer Looking For': m?.buyer?.lookingFor ?? '',
-      'Buyer Type': m?.buyer?.type ?? '',
-      'Buyer Config': m?.buyer?.config ?? '',
-      'Buyer Location': m?.buyer?.location ?? '',
-      'Buyer City': m?.buyer?.city ?? '',
-      'Buyer Budget': m?.buyer?.budget ?? '',
-      'Buyer Size': m?.buyer?.size ?? '',
-      'Buyer Broker': m?.buyer?.brokerName ?? '',
-      'Buyer Broker Phone': m?.buyer?.brokerPhone ?? '',
-      'Match Details': m?.matchDetails ? JSON.stringify(m.matchDetails) : '',
-    }));
+    const headers = [
+      'Score %',
+      'Match Quality',
+      'Property For',
+      'Property Type',
+      'Property Config',
+      'Property Location',
+      'Property City',
+      'Property Price',
+      'Property Size',
+      'Property Broker',
+      'Property Broker Phone',
+      'Buyer Looking For',
+      'Buyer Type',
+      'Buyer Config',
+      'Buyer Location',
+      'Buyer City',
+      'Buyer Budget',
+      'Buyer Size',
+      'Buyer Broker',
+      'Buyer Broker Phone',
+      'Match Details',
+    ];
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows, { skipHeader: false });
+    const escapeCsv = (value: any) => {
+      const text = value == null ? '' : String(value);
+      return '"' + text.replace(/"/g, '""') + '"';
+    };
 
-    // Keep text as-is to avoid Excel auto-coercion (e.g. phone numbers, currency strings).
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
-    for (let r = range.s.r + 1; r <= range.e.r; r++) {
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        const cell = ws[addr];
-        if (!cell) continue;
-        if (cell.t === 'n') {
-          // Keep real numbers as numbers (score)
-          continue;
-        }
-        cell.t = 's';
-        cell.v = cell.v == null ? '' : String(cell.v);
-      }
-    }
+    const rows = sortedMatches.map((m: any) => [
+      m.scorePercent ?? '',
+      m.matchQuality ?? '',
+      m?.property?.for ?? '',
+      m?.property?.type ?? '',
+      m?.property?.config ?? '',
+      m?.property?.location ?? '',
+      m?.property?.city ?? '',
+      m?.property?.price ?? '',
+      m?.property?.size ?? '',
+      m?.property?.brokerName ?? '',
+      m?.property?.brokerPhone ?? '',
+      m?.buyer?.lookingFor ?? '',
+      m?.buyer?.type ?? '',
+      m?.buyer?.config ?? '',
+      m?.buyer?.location ?? '',
+      m?.buyer?.city ?? '',
+      m?.buyer?.budget ?? '',
+      m?.buyer?.size ?? '',
+      m?.buyer?.brokerName ?? '',
+      m?.buyer?.brokerPhone ?? '',
+      m?.matchDetails ? JSON.stringify(m.matchDetails) : '',
+    ]);
 
-    // Make header row bold-ish via column widths (simple UX improvement)
-    ws['!cols'] = Object.keys(rows[0] || {}).map(() => ({ wch: 22 }));
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Matches');
-    const fileName = `matches-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-    XLSX.writeFile(wb, fileName, { compression: true });
+    const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `matches-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
-
   return (
     <div className="space-y-6">
       {/* Filter Section (Keeping the UI, but we mostly rely on pagination based on API limits) */}
-      <section className={pageUi.panel}>
+      <section className={`${pageUi.panel} relative z-20`} style={{ overflow: 'visible' }}>
         <div className={`${pageUi.panelHeader} ${pageUi.panelHeaderMuted}`}>
           <div className={pageUi.panelHeaderIconWrap}>
             <Layers className="w-5 h-5" />
@@ -440,21 +500,20 @@ const DashboardPage: React.FC = () => {
           <div className="md:col-span-2">
             <MultiSelectDropdown
               label="Match Status"
-              options={MATCH_STATUS_OPTIONS}
+              options={MATCH_SCORE_OPTIONS}
               selected={filters.matchStatus}
               onChange={(v) => toggleFilterValue('matchStatus', v)}
               placeholder="All"
-              disabled={!hasMatchStatusField}
             />
           </div>
 
           <div className="md:col-span-4">
             <MultiSelectDropdown
               label="Location"
-              options={locationOptions}
+              options={locationOptions.map((location) => ({ value: location, label: location }))}
               selected={filters.locations}
               onChange={toggleLocation}
-              placeholder={locationOptions.length ? 'All' : 'No locations'}
+              placeholder={locationOptions.length ? 'All' : 'No locations found'}
               disabled={locationOptions.length === 0}
             />
           </div>
@@ -483,7 +542,7 @@ const DashboardPage: React.FC = () => {
       </section>
 
       {/* Results Table */}
-      <div className={pageUi.panel}>
+      <div className={`${pageUi.panel} relative z-10`}>
         <div className="px-6 py-5 border-b border-slate-100 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className={pageUi.title}>Match Results</h2>
@@ -499,9 +558,9 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
           </div>
-          <button type="button" onClick={exportToExcel} className={`${pageUi.btnPrimary} w-full md:w-auto`}>
+          <button type="button" onClick={exportToCsv} className={`${pageUi.btnPrimary} w-full md:w-auto`}>
             <Download className="w-4 h-4" />
-            Export Excel
+            Export CSV
           </button>
         </div>
 
@@ -768,3 +827,15 @@ const AnimatedLoader = () => (
 );
 
 export default DashboardPage;
+
+
+
+
+
+
+
+
+
+
+
+
